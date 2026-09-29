@@ -290,6 +290,7 @@ def verify():
 
     req_type = (json_data.get("type") or form_data.get("type") or args_data.get("type") or values_data.get("type") or "").strip()
     
+    # Check all possible parameter keys
     key = (
         json_data.get("key") or form_data.get("key") or args_data.get("key") or values_data.get("key") or
         json_data.get("username") or form_data.get("username") or args_data.get("username") or values_data.get("username") or
@@ -302,7 +303,7 @@ def verify():
         json_data.get("hwid") or form_data.get("hwid") or args_data.get("hwid") or values_data.get("hwid") or "unknown_device"
     ).strip()
 
-    # 1. Panel 07 Default Response (Modified to match your custom server)
+    # 1. Panel 07 Default Response
     response_panel_07 = {
         "success": True, 
         "code": 68, 
@@ -313,11 +314,11 @@ def verify():
             "numOnlineUsers": "N/A",
             "numKeys": "N/A",
             "version": "1.0",
-            "customerPanelLink": "https://your-server-domain.com/panel"  # Put your server link here
+            "customerPanelLink": "https://keyauth.cc/panel/modderstrick/07team/"
         },
         "newSession": True,
         "nonce": uuid.uuid4().hex,
-        "ownerid": "YOUR_OWNER_ID"  # Put your custom owner ID here
+        "ownerid": "Ug7ojMSG2K"
     }
 
     # 2. BKL SENSI Custom Response
@@ -337,29 +338,38 @@ def verify():
     if req_type == "init":
         return jsonify(response_panel_07)
 
+    # Return registered failure if no key is supplied
     if not key:
         return jsonify({"status": False, "reason": "USER OR GAME NOT REGISTERED"})
 
     conn = get_db_connection()
+    # Case-insensitive query using COLLATE NOCASE to prevent mismatch issues
     row = conn.execute("SELECT max_devices, devices_list, expiry_date, status, panel_name FROM keys WHERE [key] = ? COLLATE NOCASE", (key,)).fetchone()
 
+    # Key not found in SQLite Database
     if not row:
         conn.close()
         return jsonify({"status": False, "reason": "USER OR GAME NOT REGISTERED"})
 
     max_devs, devices_list, expiry, status, panel_name = row
     
+    # Process panel name clean check
     panel_clean = panel_name.strip() if panel_name else ""
     
+    # Check if Panel x3 (The 3rd option) or Bull Team is chosen
     is_bull_team = (panel_clean == "Panel x3" or "x3" in panel_clean.lower() or "bull" in panel_clean.lower())
+    
+    # Check if BKL SENSI (Case Insensitive) is chosen
     is_bkl_sensi = (panel_clean.upper() == "BKL SENSI")
 
+    # Key is banned check
     if status == "banned":
         conn.close()
         if is_bull_team:
             return jsonify({"status": False, "reason": "YOUR ACCOUNT IS BANNED"})
         return jsonify({"success": False, "message": "banned"})
 
+    # Validate expiration dates
     try:
         expiry_dt = datetime.strptime(expiry, '%Y-%m-%d %H:%M:%S')
     except:
@@ -374,6 +384,7 @@ def verify():
             return jsonify({"status": False, "reason": "KEY EXPIRED"})
         return jsonify({"success": False, "message": "expired"})
 
+    # Check hardware instance and device limits
     devices = [d for d in (devices_list or "").split(",") if d]
     if device_id in devices or len(devices) < max_devs:
         if device_id not in devices and device_id != "unknown_device":
@@ -419,10 +430,11 @@ def verify():
             }
             return jsonify(response_bull_team)
             
-        # Default route (Panel 07) - THIS IS THE RESPONSE YOUR APK EXPECTS
+        # Default route (Panel 07)
         else:
             return jsonify(response_panel_07)
 
+    # Maximum hardware limit reached
     conn.close()
     if is_bull_team:
         return jsonify({"status": False, "reason": "DEVICE LIMIT REACHED"})
