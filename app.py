@@ -288,7 +288,13 @@ def verify():
     args_data = request.args or {}
     values_data = request.values or {}
 
-    req_type = (json_data.get("type") or form_data.get("type") or args_data.get("type") or values_data.get("type") or "").strip()
+    # التعديل هنا: إضافة قراءة المفتاح action من طلب JSON
+    req_type = (
+        json_data.get("type") or json_data.get("action") or 
+        form_data.get("type") or form_data.get("action") or 
+        args_data.get("type") or args_data.get("action") or 
+        values_data.get("type") or values_data.get("action") or ""
+    ).strip()
     
     # Check all possible parameter keys
     key = (
@@ -303,7 +309,7 @@ def verify():
         json_data.get("hwid") or form_data.get("hwid") or args_data.get("hwid") or values_data.get("hwid") or "unknown_device"
     ).strip()
 
-    # 1. Panel 07 Default Response
+    # 1. Panel 07 Default Response (المطابق تماماً للمتوقع من التطبيق)
     response_panel_07 = {
         "success": True, 
         "code": 68, 
@@ -430,7 +436,7 @@ def verify():
             }
             return jsonify(response_bull_team)
             
-        # Default route (Panel 07)
+        # Default route (Panel 07) - هذا هو الرد الذي سيتلقاه التطبيق
         else:
             return jsonify(response_panel_07)
 
